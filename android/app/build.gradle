@@ -84,6 +84,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // Development API defaults to the local Laravel HTTP server. Set this
+        // to false in a production flavor whose API base is HTTPS.
+        manifestPlaceholders = [usesCleartextTraffic: "true"]
     }
     signingConfigs {
         debug {

@@ -1,0 +1,1 @@
+module.exports = {DocumentDirectoryPath: '/tmp', mkdir: async () => undefined, exists: async () => false, unlink: async () => undefined, writeFile: async () => undefined, readFile: async () => '', stat: async () => ({size: 0}), downloadFile: () => ({promise: Promise.resolve()})};
