@@ -1,5 +1,5 @@
 import React, {createContext, useCallback, useContext, useMemo, useState, useEffect} from 'react';
-import {StyleSheet, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from './components/ui';
 import HomeScreen from './screens/HomeScreen';
@@ -53,7 +53,7 @@ function ScreenRouter({path}: {path: string}) {
   if (route === '/player') return <PlayerScreen />;
   if (route === '/news' || route.startsWith('/news/')) return <NewsScreen path={current} />;
   if (route === '/watch/clips' || route.startsWith('/watch/clips/') || route === '/clips') return <ClipsScreen />;
-  if (route === '/watch/live' || route.startsWith('/watch/live/')) return <WatchLiveScreen path={current} />;
+  if (route === '/watch/live' || route.startsWith('/watch/live/')) return <RouteErrorBoundary><View style={styles.routeRegion}><WatchLiveScreen path={current} /></View></RouteErrorBoundary>;
   if (route === '/watch/search') return <WatchSearchScreen path={current} />;
   if (route === '/watch' || route.startsWith('/watch/')) return <WatchScreen path={current} />;
   if (route === '/ott') return <WatchScreen path="/watch" />;
@@ -68,6 +68,15 @@ function ScreenRouter({path}: {path: string}) {
 }
 
 type Portal = 'listen' | 'watch' | 'news';
+
+class RouteErrorBoundary extends React.Component<React.PropsWithChildren, {error: Error | null}> {
+  state: {error: Error | null} = {error: null};
+  static getDerivedStateFromError(error: Error) { return {error}; }
+  render() {
+    if (this.state.error) return <View style={styles.routeError}><Text style={styles.routeErrorTitle}>Live TV could not be displayed</Text><Text style={styles.routeErrorText}>Please refresh this screen.</Text></View>;
+    return this.props.children;
+  }
+}
 
 function portalForRoute(route: string): Portal {
   if (route === '/news' || route.startsWith('/news/')) return 'news';
@@ -94,22 +103,30 @@ export function AppNavigator() {
   const value = useMemo(() => ({path, navigate, replace, back}), [path, navigate, replace, back]);
   const route = normalise(path).split(/[?#]/, 1)[0];
   const portal = portalForRoute(route);
+  const immersiveClips = route === '/clips' || route === '/watch/clips' || route.startsWith('/watch/clips/');
   const setPortal = useUi(state => state.setPortal);
   useEffect(() => {
     setPortal(portal);
   }, [portal, setPortal]);
   return <NavigationContext.Provider value={value}>
-    <View style={[styles.root, {backgroundColor: colors.bg, paddingTop: insets.top}]}>
+    <View style={[styles.root, {backgroundColor: colors.bg, paddingTop: immersiveClips ? 0 : insets.top}]}>
       <PlayerEngine />
-      <PortalHeader portal={portal} route={route} onNavigate={navigate} />
+      {!immersiveClips && <PortalHeader portal={portal} route={route} onNavigate={navigate} />}
       <View style={styles.screenRegion}><ScreenRouter path={path} /></View>
-      <PlayerBar />
+      {!immersiveClips && <PlayerBar />}
       <UserModals />
     </View>
   </NavigationContext.Provider>;
 }
 
-const styles = StyleSheet.create({root: {flex: 1}, screenRegion: {flex: 1}});
+const styles = StyleSheet.create({
+  root: {flex: 1},
+  screenRegion: {flex: 1, flexGrow: 1, minHeight: 1},
+  routeRegion: {flex: 1, flexGrow: 1, minHeight: 1},
+  routeError: {flex: 1, minHeight: 220, padding: 24, justifyContent: 'center', alignItems: 'center'},
+  routeErrorTitle: {fontSize: 20, fontWeight: '800', color: '#d43b55', textAlign: 'center'},
+  routeErrorText: {fontSize: 14, marginTop: 8, color: '#707681', textAlign: 'center'},
+});
 
 export default AppNavigator;
 

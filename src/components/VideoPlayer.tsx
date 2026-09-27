@@ -12,6 +12,7 @@ export interface VideoPlayerProps {
   poster?: string | null;
   autoPlay?: boolean;
   compact?: boolean;
+  fullScreen?: boolean;
   onEnd?: () => void;
 }
 
@@ -33,6 +34,7 @@ export default function VideoPlayer({
   poster,
   autoPlay = false,
   compact = false,
+  fullScreen = false,
   onEnd,
 }: VideoPlayerProps) {
   const colors = useTheme();
@@ -78,7 +80,7 @@ export default function VideoPlayer({
     <View
       style={[
         styles.root,
-        compact && styles.compact,
+        fullScreen ? styles.fullScreen : compact && styles.compact,
         { backgroundColor: '#000' },
       ]}
     >
@@ -194,6 +196,7 @@ export default function VideoPlayer({
 const styles = StyleSheet.create({
   root: { width: '100%', aspectRatio: 16 / 9, overflow: 'hidden' },
   compact: { aspectRatio: 16 / 10 },
+  fullScreen: { flex: 1, width: '100%', height: '100%', aspectRatio: undefined },
   empty: { alignItems: 'center', justifyContent: 'center' },
   overlay: {
     position: 'absolute',

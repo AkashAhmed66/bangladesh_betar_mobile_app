@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
+  useWindowDimensions,
   Pressable,
   Share,
   StyleSheet,
@@ -9,6 +10,18 @@ import {
   View,
 } from 'react-native';
 import Video from 'react-native-video';
+import {
+  ArrowLeft,
+  Disc3,
+  Heart,
+  Pause,
+  Play,
+  Share2,
+  ThumbsDown,
+  Volume2,
+  VolumeX,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useNavigation } from '../navigation';
 import { useTheme } from '../components/ui';
 import { get, mediaUrl, put } from '../lib/api';
@@ -17,7 +30,7 @@ import type { Paginated, WatchClip } from '../lib/types';
 import { useAuth } from '../stores/auth';
 import { localizedText, translate, useTranslation } from '../lib/i18n';
 import { useUi } from '../stores/ui';
-import { useResponsiveLayout } from '../lib/responsive';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // The web portal keeps a curated editorial feed available while the API is
 // empty during a deployment. Keep the same resilient behavior on mobile.
@@ -85,20 +98,16 @@ function ClipItem({
   clip,
   active,
   onNext,
-  onPrev,
+  viewportHeight,
 }: {
   clip: WatchClip;
   active: boolean;
   onNext: () => void;
-  onPrev: () => void;
+  viewportHeight: number;
 }) {
   const colors = useTheme();
   const nav = useNavigation();
-  const { height, width } = useResponsiveLayout();
-  // The web clips experience fills the viewport. On mobile the portal header
-  // and bottom tabs consume part of it, so page each clip inside the remaining
-  // viewport instead of hiding the copy and action rail underneath navigation.
-  const viewportHeight = Math.max(360, height - (width > height ? 96 : 148));
+  const insets = useSafeAreaInsets();
   const token = useAuth(state => state.token);
   const [playing, setPlaying] = useState(active);
   const [muted, setMuted] = useState(true);
@@ -192,7 +201,7 @@ function ClipItem({
     try {
       await Share.share({
         title: localized(clip, 'title'),
-        message: `${localized(clip, 'title')} — Bangladesh Betar Clips`,
+        message: `${localized(clip, 'title')} - Bangladesh Betar Clips`,
       });
     } catch {
       /* cancelled */
@@ -231,49 +240,69 @@ function ClipItem({
         style={StyleSheet.absoluteFill}
         onPress={() => setPlaying(value => !value)}
       />
-      <Pressable onPress={nav.back} style={styles.back}>
-        <Text style={styles.backText}>‹ {clipText('backToWatch')}</Text>
+      <Pressable
+        onPress={nav.back}
+        style={[styles.back, {top: Math.max(18, insets.top + 8)}]}
+        accessibilityRole="button"
+        accessibilityLabel={clipText('backToWatch')}>
+        <ArrowLeft size={20} color="#fff" strokeWidth={2.5} />
+        <Text style={styles.backText}>{clipText('backToWatch')}</Text>
       </Pressable>
-      <View style={styles.sideRail}>
+      <View style={[styles.topControls, {top: Math.max(18, insets.top + 8)}]}>
+        <Pressable
+          onPress={() => setPlaying(value => !value)}
+          style={styles.topButton}
+          accessibilityRole="button"
+          accessibilityLabel={playing ? clipText('pause') : clipText('play')}>
+          {playing ? (
+            <Pause size={21} color="#fff" fill="#fff" strokeWidth={2.4} />
+          ) : (
+            <Play size={21} color="#fff" fill="#fff" strokeWidth={2.4} />
+          )}
+        </Pressable>
+        <Pressable
+          onPress={() => setMuted(value => !value)}
+          style={styles.topButton}
+          accessibilityRole="button"
+          accessibilityLabel={muted ? clipText('unmute') : clipText('mute')}>
+          {muted ? (
+            <VolumeX size={21} color="#fff" strokeWidth={2.4} />
+          ) : (
+            <Volume2 size={21} color="#fff" strokeWidth={2.4} />
+          )}
+        </Pressable>
+      </View>
+      <View style={[styles.sideRail, { bottom: Math.max(22, insets.bottom + 18) }]}>
         <Pressable
           disabled={reactionBusy}
           onPress={() => void react('like')}
           style={styles.action}
+          accessibilityLabel={`${clipText('like')} ${count(likes)}`}
         >
-          <Text style={styles.actionIcon}>
-            {reaction === 'like' ? '♥' : '♡'}
-          </Text>
+          <ActionIcon Icon={Heart} active={reaction === 'like'} />
           <Text style={styles.actionLabel}>{count(likes)}</Text>
         </Pressable>
         <Pressable
           disabled={reactionBusy}
           onPress={() => void react('dislike')}
           style={styles.action}
+          accessibilityLabel={`${clipText('dislike')} ${count(dislikes)}`}
         >
-          <Text style={styles.actionIcon}>
-            {reaction === 'dislike' ? '👎' : '♧'}
-          </Text>
+          <ActionIcon Icon={ThumbsDown} active={reaction === 'dislike'} />
           <Text style={styles.actionLabel}>{count(dislikes)}</Text>
         </Pressable>
-        <Pressable
-          onPress={() => setMuted(value => !value)}
-          style={styles.action}
-        >
-          <Text style={styles.actionIcon}>{muted ? '🔇' : '🔊'}</Text>
-          <Text style={styles.actionLabel}>{muted ? clipText('unmute') : clipText('mute')}</Text>
-        </Pressable>
-        <Pressable onPress={() => void share()} style={styles.action}>
-          <Text style={styles.actionIcon}>↗</Text>
+        <Pressable onPress={() => void share()} style={styles.action} accessibilityLabel={clipText('share')}>
+          <Share2 size={28} color="#fff" strokeWidth={2.3} />
           <Text style={styles.actionLabel}>{clipText('share')}</Text>
         </Pressable>
-        <Pressable onPress={onPrev} style={styles.action}>
-          <Text style={styles.actionIcon}>⌃</Text>
-          <Text style={styles.actionLabel}>{clipText('prevClip')}</Text>
-        </Pressable>
-        <Pressable onPress={onNext} style={styles.action}>
-          <Text style={styles.actionIcon}>⌄</Text>
-          <Text style={styles.actionLabel}>{clipText('nextClip')}</Text>
-        </Pressable>
+        <View style={styles.discAction} accessibilityLabel={clip.audio_track || 'Original Betar audio'}>
+          <View style={styles.discIcon}>
+            <Disc3 size={26} color="#fff" strokeWidth={2.1} />
+          </View>
+          <Text numberOfLines={1} style={[styles.actionLabel, styles.discLabel]}>
+            {clip.audio_track || 'Original Betar audio'}
+          </Text>
+        </View>
       </View>
       <View style={styles.copy}>
         <Text style={styles.creator}>
@@ -283,9 +312,10 @@ function ClipItem({
         <Text numberOfLines={3} style={styles.clipDescription}>
           {localized(clip, 'description')}
         </Text>
-        <Text style={styles.sound}>
-          ◉ {clip.audio_track || 'Original Betar audio track'}
-        </Text>
+        <View style={styles.soundRow}>
+          <Disc3 size={15} color="#fff" strokeWidth={2.1} />
+          <Text style={styles.sound}>{clip.audio_track || 'Original Betar audio track'}</Text>
+        </View>
         <View style={styles.tags}>
           {(clip.hashtags || []).map(tag => (
             <Text key={tag} style={styles.tag}>
@@ -296,12 +326,22 @@ function ClipItem({
       </View>
       {!playing && (
         <View pointerEvents="none" style={styles.playIndicator}>
-          <Text style={styles.playText}>▶</Text>
+          <Play size={28} color="#fff" fill="#fff" strokeWidth={2.2} />
         </View>
       )}
-      <Text style={[styles.technical, { color: colors.muted }]}>
-        {active ? clipText('playNow') : ''}
-      </Text>
+    </View>
+  );
+}
+
+function ActionIcon({Icon, active}: {Icon: LucideIcon; active?: boolean}) {
+  return (
+    <View style={[styles.actionIcon, active && styles.actionIconActive]}>
+      <Icon
+        size={26}
+        color="#fff"
+        strokeWidth={2.4}
+        fill={active ? '#fff' : 'transparent'}
+      />
     </View>
   );
 }
@@ -309,8 +349,12 @@ function ClipItem({
 export function ClipsScreen() {
   const colors = useTheme();
   useTranslation();
-  const { height, width } = useResponsiveLayout();
-  const viewportHeight = Math.max(360, height - (width > height ? 96 : 148));
+  const {height: windowHeight} = useWindowDimensions();
+  const [containerHeight, setContainerHeight] = useState(0);
+  // useWindowDimensions can exclude the Android navigation area while the
+  // actual FlatList viewport still includes it. Measure the real container so
+  // every paged item is exactly one screen tall and never drifts after swipes.
+  const viewportHeight = containerHeight || Math.max(1, windowHeight);
   const result = useApi<Paginated<WatchClip>>('/watch-clips?per_page=50');
   const clips = result.data?.data?.length ? result.data.data : FALLBACK_CLIPS;
   const [index, setIndex] = useState(0);
@@ -331,12 +375,24 @@ export function ClipsScreen() {
       </View>
     );
   return (
-    <View style={[styles.root, {backgroundColor: colors.bg}]}>
+    <View
+      style={[styles.root, {backgroundColor: colors.bg}]}
+      onLayout={event => {
+        const nextHeight = Math.round(event.nativeEvent.layout.height);
+        if (nextHeight > 0 && nextHeight !== containerHeight) {
+          setContainerHeight(nextHeight);
+        }
+      }}>
       <FlatList
         ref={listRef}
         data={clips}
+        style={styles.list}
         keyExtractor={clip => String(clip.id)}
         pagingEnabled
+        snapToAlignment="start"
+        bounces={false}
+        overScrollMode="never"
+        removeClippedSubviews={false}
         showsVerticalScrollIndicator={false}
         getItemLayout={(_, itemIndex) => ({
           length: viewportHeight,
@@ -345,9 +401,12 @@ export function ClipsScreen() {
         })}
         onMomentumScrollEnd={event =>
           setIndex(
-            Math.round(
-              event.nativeEvent.contentOffset.y /
-                event.nativeEvent.layoutMeasurement.height,
+            Math.max(
+              0,
+              Math.min(
+                clips.length - 1,
+                Math.round(event.nativeEvent.contentOffset.y / viewportHeight),
+              ),
             ),
           )
         }
@@ -356,7 +415,7 @@ export function ClipsScreen() {
             clip={item}
             active={itemIndex === index}
             onNext={() => move(itemIndex + 1)}
-            onPrev={() => move(itemIndex - 1)}
+            viewportHeight={viewportHeight}
           />
         )}
       />
@@ -368,6 +427,7 @@ export default ClipsScreen;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0d0204' },
+  list: { flex: 1 },
   item: { width: '100%', overflow: 'hidden' },
   gradient: {
     position: 'absolute',
@@ -384,27 +444,88 @@ const styles = StyleSheet.create({
     top: 18,
     left: 15,
     zIndex: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 9,
     backgroundColor: 'rgba(0,0,0,.65)',
   },
   backText: { color: '#fff', fontWeight: '800' },
+  topControls: {
+    position: 'absolute',
+    right: 15,
+    zIndex: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  topButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,.3)',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    shadowOffset: {width: 0, height: 2},
+    elevation: 4,
+  },
   sideRail: {
     position: 'absolute',
     right: 12,
-    bottom: 165,
-    gap: 18,
+    width: 52,
+    gap: 16,
     alignItems: 'center',
+    zIndex: 4,
   },
-  action: { alignItems: 'center', minWidth: 44 },
+  action: {
+    width: 52,
+    minWidth: 52,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  discAction: {
+    width: 52,
+    minWidth: 52,
+    maxWidth: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  discIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,.46)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,.28)',
+  },
   actionIcon: {
-    fontSize: 28,
-    color: '#fff',
-    textShadowColor: '#000',
-    textShadowRadius: 5,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,.46)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,.28)',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    shadowOffset: {width: 0, height: 2},
+    elevation: 4,
   },
-  actionLabel: { fontSize: 11, color: '#fff', fontWeight: '700', marginTop: 2 },
+  actionIconActive: { backgroundColor: 'rgba(212,59,85,.9)', borderColor: 'rgba(255,255,255,.55)' },
+  actionLabel: { fontSize: 11, color: '#fff', fontWeight: '700', marginTop: 2, textAlign: 'center' },
+  discLabel: { width: 52, maxWidth: 52 },
   copy: { position: 'absolute', left: 17, right: 72, bottom: 36 },
   creator: { fontSize: 13, color: '#fff', fontWeight: '900' },
   clipTitle: {
@@ -420,7 +541,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,.82)',
     marginTop: 5,
   },
-  sound: { fontSize: 12, color: '#fff', marginTop: 10 },
+  soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  sound: { fontSize: 12, color: '#fff', flexShrink: 1 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   tag: { fontSize: 11, color: '#fff', fontWeight: '800' },
   playIndicator: {
@@ -436,8 +558,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playText: { fontSize: 25, color: '#fff' },
-  technical: { position: 'absolute', top: 21, right: 15, fontSize: 10 },
   center: {
     flex: 1,
     alignItems: 'center',

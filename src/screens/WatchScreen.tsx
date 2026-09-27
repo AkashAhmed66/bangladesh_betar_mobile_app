@@ -2,11 +2,13 @@
 import {
   FlatList,
   Image,
+  Modal,
   Pressable,
   RefreshControl,
   Share,
   ScrollView,
   StyleSheet,
+  StatusBar,
   Text,
   TextInput,
   View,
@@ -27,6 +29,16 @@ import { useAuth } from '../stores/auth';
 import { useUi } from '../stores/ui';
 import { localizedText, translate, useTranslation } from '../lib/i18n';
 import { useResponsiveLayout } from '../lib/responsive';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Check,
+  Clapperboard,
+  Minimize2,
+  Play,
+  Plus,
+  Share2,
+  X,
+} from 'lucide-react-native';
 
 type ApiResult<T> = {
   data?: T;
@@ -61,7 +73,7 @@ const CATEGORY_COLORS = ['#973e62', '#227f79', '#a56625', '#3f6eb5', '#6552a5'];
 
 function ShowCard({ show, onPress, rank, cardWidthOverride }: { show: WatchShow; onPress: () => void; rank?: number; cardWidthOverride?: number }) {
   const colors = useTheme();
-  const { width, compact, pageStyle } = useResponsiveLayout();
+  const { width, compact } = useResponsiveLayout();
   const cardWidth = cardWidthOverride ?? Math.min(352, Math.max(236, width * (compact ? 0.78 : width >= 1024 ? 0.30 : 0.42)));
   return (
     <Pressable onPress={onPress} style={[styles.showCard, { width: cardWidth }]}>
@@ -98,6 +110,70 @@ function ShowCard({ show, onPress, rank, cardWidthOverride }: { show: WatchShow;
         {watchText('episodesLabel')}: {show.episodes_count ?? show.episodes?.length ?? 0}
       </Text>
     </Pressable>
+  );
+}
+
+function TrailerModal({
+  visible,
+  src,
+  poster,
+  title,
+  onClose,
+}: {
+  visible: boolean;
+  src: string;
+  poster?: string | null;
+  title: string;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="fade"
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={styles.trailerModalRoot}>
+        <StatusBar hidden />
+        <SafeAreaView style={styles.trailerModalSafe}>
+          <View style={styles.trailerModalHeader}>
+            <View style={styles.trailerModalTitle}>
+              <Clapperboard size={20} color="#fff" strokeWidth={2.2} />
+              <Text numberOfLines={1} style={styles.trailerModalTitleText}>
+                {title}
+              </Text>
+            </View>
+            <View style={styles.trailerModalActions}>
+              <Pressable
+                onPress={onClose}
+                style={styles.trailerModalButton}
+                accessibilityRole="button"
+                accessibilityLabel="Exit fullscreen trailer"
+              >
+                <Minimize2 size={20} color="#fff" strokeWidth={2.3} />
+              </Pressable>
+              <Pressable
+                onPress={onClose}
+                style={styles.trailerModalButton}
+                accessibilityRole="button"
+                accessibilityLabel="Close trailer"
+              >
+                <X size={21} color="#fff" strokeWidth={2.3} />
+              </Pressable>
+            </View>
+          </View>
+          <View style={styles.trailerModalVideo}>
+            <VideoPlayer
+              src={src}
+              poster={poster}
+              autoPlay
+              fullScreen
+            />
+          </View>
+        </SafeAreaView>
+      </View>
+    </Modal>
   );
 }
 
@@ -641,8 +717,11 @@ function WatchDetail({
 }) {
   const nav = useNavigation();
   const colors = useTheme();
-  const { width, pageStyle } = useResponsiveLayout();
-  const detailHeroHeight = Math.min(700, Math.max(390, width * (width >= 768 ? 0.54 : 1.02)));
+  const { width, compact, pageStyle } = useResponsiveLayout();
+  const detailHeroHeight = Math.min(
+    620,
+    Math.max(compact ? 350 : 430, width * (compact ? 0.9 : 0.54)),
+  );
   const token = useAuth(state => state.token);
   const isPremium = useAuth(state => Boolean(state.entitlements?.is_premium));
   const result = asResult<{ data: WatchShow }>(
@@ -656,6 +735,11 @@ function WatchDetail({
   const [reviewBody, setReviewBody] = useState('');
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewNotice, setReviewNotice] = useState('');
+  const [trailerOpen, setTrailerOpen] = useState(false);
+  const trailerSrc =
+    show?.trailer_url ||
+    (show as (WatchShow & { trailer_path?: string | null }) | undefined)?.trailer_path ||
+    null;
   useEffect(() => {
     if (show) setSaved(Boolean(show.is_in_watchlist));
   }, [show]);
@@ -732,10 +816,11 @@ function WatchDetail({
   };
   const canPlay = Boolean(current?.video_url && token && isPremium);
   return (
-    <ScrollView
-      style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={[styles.detail, pageStyle]}
-    >
+    <>
+      <ScrollView
+        style={{ backgroundColor: colors.bg }}
+        contentContainerStyle={[styles.detail, pageStyle]}
+      >
       <Pressable onPress={nav.back}>
         <Text style={[styles.back, { color: colors.accent }]}>
           ‹ {watchText('backToWatch')}
@@ -760,20 +845,45 @@ function WatchDetail({
           <View style={[styles.detailActions, { maxWidth: width >= 768 ? 760 : undefined }]}>
             <Pressable
               onPress={() => current && void play(current)}
-              style={styles.heroButton}
+              style={[styles.detailPrimaryButton, { backgroundColor: colors.accent }]}
             >
-              <Text style={{ fontWeight: '900' }}>▶ {watchText('startWatching')}</Text>
+              <Play size={17} color="#fff" fill="#fff" strokeWidth={2.3} />
+              <Text style={styles.detailActionText}>{watchText('startWatching')}</Text>
             </Pressable>
-            <Pressable onPress={() => void save()} style={styles.outlineButton}>
-              <Text style={{ color: '#fff', fontWeight: '800' }}>
-                {saved ? `✓ ${watchText('saved')}` : `+ ${watchText('addToWatchlist')}`}
+            {trailerSrc ? (
+              <Pressable
+                onPress={() => setTrailerOpen(true)}
+                style={styles.detailTrailerButton}
+                accessibilityRole="button"
+                accessibilityLabel={watchText('watchTrailer')}
+              >
+                <Clapperboard size={17} color="#fff" strokeWidth={2.2} />
+                <Text style={styles.detailActionText}>{watchText('watchTrailer')}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => void save()}
+              style={styles.detailOutlineButton}
+              accessibilityRole="button"
+              accessibilityLabel={saved ? watchText('saved') : watchText('addToWatchlist')}
+            >
+              {saved ? (
+                <Check size={17} color="#fff" strokeWidth={2.5} />
+              ) : (
+                <Plus size={17} color="#fff" strokeWidth={2.5} />
+              )}
+              <Text style={styles.detailActionText}>
+                {saved ? watchText('saved') : watchText('addToWatchlist')}
               </Text>
             </Pressable>
             <Pressable
               onPress={() => void Share.share({ title: localized(show, 'title'), message: `${localized(show, 'title')} — Bangladesh Betar Watch` })}
-              style={styles.outlineButton}
+              style={styles.detailOutlineButton}
+              accessibilityRole="button"
+              accessibilityLabel={watchText('share')}
             >
-              <Text style={{ color: '#fff', fontWeight: '800' }}>{watchText('share')}</Text>
+              <Share2 size={17} color="#fff" strokeWidth={2.2} />
+              <Text style={styles.detailActionText}>{watchText('share')}</Text>
             </Pressable>
           </View>
         </View>
@@ -818,16 +928,6 @@ function WatchDetail({
           </Text>
         ) : null}
       </View>
-      {show.trailer_url ? (
-        <View style={styles.trailer}>
-          <Text style={[styles.heading, { color: colors.text }]}>{watchText('watchTrailer')}</Text>
-          <VideoPlayer
-            src={show.trailer_url}
-            title={`${localized(show, 'title')} trailer`}
-            poster={show.image_url}
-          />
-        </View>
-      ) : null}
       {current ? (
         <View style={[styles.playerBox, { backgroundColor: colors.elevated, flexDirection: width >= 1024 ? 'row' : 'column' }]}>
           <View style={[styles.playerMedia, width >= 1024 && { width: '66%' }]}>
@@ -1009,7 +1109,17 @@ function WatchDetail({
           />
         </View>
       ) : null}
-    </ScrollView>
+      </ScrollView>
+      {trailerSrc ? (
+        <TrailerModal
+          visible={trailerOpen}
+          src={trailerSrc}
+          poster={show.image_url}
+          title={`${localized(show, 'title')} trailer`}
+          onClose={() => setTrailerOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -1194,15 +1304,79 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
   },
   detailHeroCopy: { position: 'absolute', left: 17, right: 17, bottom: 19 },
-  detailActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 15 },
-  outlineButton: {
+  detailActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 13,
+  },
+  detailPrimaryButton: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 22,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+  },
+  detailTrailerButton: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 22,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    backgroundColor: 'rgba(255,255,255,.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,.65)',
+  },
+  detailOutlineButton: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     borderColor: 'rgba(255,255,255,.6)',
     borderWidth: 1,
     borderRadius: 22,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
   },
-  trailer: { marginTop: 20, gap: 8 },
+  detailActionText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  trailerModalRoot: {
+    flex: 1,
+    backgroundColor: '#030405',
+  },
+  trailerModalSafe: { flex: 1 },
+  trailerModalHeader: {
+    minHeight: 58,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  trailerModalTitle: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  trailerModalTitleText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  trailerModalActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  trailerModalButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,.28)',
+  },
+  trailerModalVideo: { flex: 1, minHeight: 0 },
   playerBox: { marginTop: 20, borderRadius: 13, overflow: 'hidden' },
   playerMedia: { width: '100%' },
   videoPlaceholder: {
