@@ -2,6 +2,12 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+project.ext.envConfigFiles = [
+    debug: ".env.development",
+    release: ".env.production",
+]
+apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -72,6 +78,19 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def requiredEnv = { String name ->
+    def value = project.env.get(name)
+    if (!value) {
+        throw new GradleException("Missing ${name}. Copy .env.example to the environment file for this build.")
+    }
+    return value
+}
+
+def appVersionName = requiredEnv("BETAR_APP_VERSION")
+def appVersionCode = requiredEnv("BETAR_VERSION_CODE").toInteger()
+def allowCleartext = requiredEnv("BETAR_ANDROID_USES_CLEARTEXT").toBoolean()
+requiredEnv("BETAR_API_BASE")
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -82,11 +101,9 @@ android {
         applicationId "com.bangladesh_betar_mobile_app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
-        // Development API defaults to the local Laravel HTTP server. Set this
-        // to false in a production flavor whose API base is HTTPS.
-        manifestPlaceholders = [usesCleartextTraffic: "true"]
+        versionCode appVersionCode
+        versionName appVersionName
+        manifestPlaceholders = [usesCleartextTraffic: allowCleartext.toString()]
     }
     signingConfigs {
         debug {

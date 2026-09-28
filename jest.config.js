@@ -11,6 +11,7 @@ module.exports = {
     '^react-native-video$': '<rootDir>/__mocks__/react-native-video.js',
     '^@react-native-community/slider$': '<rootDir>/__mocks__/slider.js',
     '^react-native-fs$': '<rootDir>/__mocks__/react-native-fs.js',
+    '^react-native-config$': '<rootDir>/__mocks__/react-native-config.js',
     '^react-native-keychain$': '<rootDir>/__mocks__/react-native-keychain.js',
     '^@livekit/react-native-webrtc$': '<rootDir>/__mocks__/livekit-webrtc.js',
     '^@livekit/react-native$': '<rootDir>/__mocks__/livekit-native.js',

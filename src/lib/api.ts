@@ -1,8 +1,6 @@
-import {Platform} from 'react-native';
+import {env} from '../config/env';
 
-const runtimeBase = (globalThis as any).__BETAR_API_BASE__ as string | undefined;
-const envBase = (globalThis as any).process?.env?.BETAR_API_BASE as string | undefined;
-export const API_BASE = (runtimeBase || envBase || (Platform.OS === 'android' ? 'http://10.0.2.2:15000/api/v1' : 'http://localhost:15000/api/v1')).replace(/\/$/, '');
+export const API_BASE = env.apiBase;
 export function resolveApiBase() { return API_BASE; }
 export class ApiError extends Error { status: number; errors?: Record<string, string[]>; constructor(status: number, message: string, errors?: Record<string, string[]>) { super(message); this.status = status; this.errors = errors; } get firstError() { return this.errors ? Object.values(this.errors)[0]?.[0] || this.message : this.message; } }
 let tokenGetter: () => string | null = () => null;

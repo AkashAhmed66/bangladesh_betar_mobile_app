@@ -30,5 +30,20 @@ target 'bangladesh_betar_mobile_app' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Select an environment file for every Xcode build configuration.
+    # react-native-config reads ENVFILE from the pod target's script phase;
+    # without this mapping, iOS silently falls back to the root .env file.
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'react-native-config'
+
+      target.build_configurations.each do |build_config|
+        build_config.build_settings['ENVFILE'] = case build_config.name
+                                                  when 'Debug' then '.env'
+                                                  when 'Release' then '.env.production'
+                                                  else '.env'
+                                                  end
+      end
+    end
   end
 end
